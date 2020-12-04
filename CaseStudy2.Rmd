@@ -1,0 +1,320 @@
+---
+title: "CaseStudy2"
+author: "Allen Miller"
+date: "11/27/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+#Load Libraries & Set Environment
+```{r}
+library(ggplot2)
+library(GGally)
+library(caret)
+library(MASS)
+library(tidyverse)
+library(e1071)
+library(mvtnorm)
+library(class)
+library(plyr)
+library(dplyr)
+options(scipen = 999)
+```
+
+## Import Data
+```{r}
+attrition <- read.csv(file.choose())
+#attrition <- read.csv("/Users/allenmiller/OneDrive - Southern Methodist University/Doing Data Science/CaseStudy2/CaseStudy2-data.csv")
+
+
+attrition$Attrition <- factor(attrition$Attrition)
+attrition$BusinessTravel <- factor(attrition$BusinessTravel)
+attrition$Department <- factor(attrition$Department)
+attrition$EducationField <- factor(attrition$EducationField)
+attrition$Gender <- factor(attrition$Gender)
+attrition$JobRole <- factor(attrition$JobRole)
+attrition$MaritalStatus <- factor(attrition$MaritalStatus)
+attrition$Over18 <- factor(attrition$Over18)
+attrition$OverTime <- factor(attrition$OverTime)
+attrition$Education <- factor(attrition$Education)
+attrition$EnvironmentSatisfaction <- factor(attrition$EnvironmentSatisfaction)
+attrition$JobInvolvement <- factor(attrition$JobInvolvement)
+attrition$JobLevel <- factor(attrition$JobLevel)
+attrition$JobSatisfaction <- factor(attrition$JobSatisfaction)
+attrition$PerformanceRating <- factor(attrition$PerformanceRating)
+attrition$RelationshipSatisfaction <- factor(attrition$RelationshipSatisfaction)
+attrition$StockOptionLevel <- factor(attrition$StockOptionLevel)
+attrition$WorkLifeBalance <- factor(attrition$WorkLifeBalance)
+
+str(attrition)
+```
+
+#Explore the data
+##Selected Variables
+###Age(2), DistanceFromHome(7), JobLevel(16), MonthlyIncome(20), NumCompaniesWorked(22), OverTime(24)
+```{r}
+#Keep = Age, BusinessTravel, Department, DistanceFromHome (2,4,6,7)
+attrition %>% dplyr::select(Attrition, Age, BusinessTravel, DailyRate, Department, DistanceFromHome)%>%
+  ggpairs()
+
+#Keep = Education, EnvironmentSatisfaction (8,12)
+attrition %>% dplyr::select(Attrition, Education, EducationField, EnvironmentSatisfaction, Gender, HourlyRate)%>%
+  ggpairs()
+
+#Keep = JobInvolvement, JobLevel, JobRole JobSatisfaction (15,16,17,18)
+attrition %>% dplyr::select(Attrition, JobInvolvement, JobLevel, JobRole, JobSatisfaction, MaritalStatus)%>%
+  ggpairs()
+
+#Keep = MonthlyIncome, NumCompaniesWorked, OverTime (20,22,24)
+attrition %>% dplyr::select(Attrition, MonthlyIncome, MonthlyRate, NumCompaniesWorked, Over18, OverTime)%>%
+  ggpairs()
+
+#Keep = PerformanceRating, RelationshipSatisfaction, StockOptionLevel, TotalWorkingYears (26,27,29,30)
+attrition %>% dplyr::select(Attrition, PercentSalaryHike, PerformanceRating, RelationshipSatisfaction, StockOptionLevel, TotalWorkingYears)%>%
+  ggpairs()
+
+#Keep = WorkLifeBalance, YearsAtCompany, YearsInCurrentRole (32,33,34)
+attrition %>% dplyr::select(Attrition, TrainingTimesLastYear, WorkLifeBalance, YearsAtCompany, YearsInCurrentRole)%>%
+  ggpairs()
+
+#Keep = YearsSinceLastPromotion, YearsWithCurrManager (35,36)
+attrition %>% dplyr::select(Attrition, YearsSinceLastPromotion, YearsWithCurrManager)%>%
+  ggpairs()
+
+```
+
+#Run Neive Bayes with 22 selected variables
+##Results
+###Mean Accuracy = 83.25%
+###Mean Sensitivity = 87.75%
+###Mean Specificity = 61.03%
+```{r}
+
+set.seed(10)
+
+iterations = 10
+
+masterAcc = matrix(nrow = iterations)
+masterSen = matrix(nrow = iterations)
+masterSpec = matrix(nrow = iterations)
+
+splitPerc = .7 #Training / Test split Percentage
+
+for(j in 1:iterations)
+{
+  trainIndices = sample(1:dim(attrition)[1],round(splitPerc * dim(attrition)[1]))
+  train = attrition[trainIndices,]
+  test = attrition[-trainIndices,]
+  
+  model = naiveBayes(train,train$Attrition, laplace = 1)
+  table(predict(model,test[,c(2,4,6,7,8,12,15,16,17,18,20,22,24,26,27,29,30,32,33,34,35,36)]),test$Attrition)
+  CMB = confusionMatrix(table(predict(model,test[,c(2,4,6,7,8,12,15,16,17,18,20,22,24,26,27,29,30,32,33,34,35,36)]),test$Attrition))
+  masterAcc[j] = CMB$overall[1]
+  masterSen[j] = CMB$byClass[1]
+  masterSpec[j] = CMB$byClass[2]
+}
+MeanAcc = colMeans(masterAcc)
+MeanSen = colMeans(masterSen)
+MeanSpec = colMeans(masterSpec)
+
+#Results
+MeanAcc
+MeanSen
+MeanSpec
+```
+
+#Use Test Set inside the Model
+```{r}
+#Blank DataSet
+attritionTest <- read.csv(file.choose())
+#attritionTest <- read.csv("/Users/allenmiller/OneDrive - Southern Methodist University/Doing Data Science/CaseStudy2/CaseStudy2CompSet No Attrition.csv")
+
+summary(attritionTest)
+
+#Change Test Data to Factors where applicable
+attritionTest$BusinessTravel <- factor(attritionTest$BusinessTravel)
+attritionTest$Department <- factor(attritionTest$Department)
+attritionTest$EducationField <- factor(attritionTest$EducationField)
+attritionTest$Gender <- factor(attritionTest$Gender)
+attritionTest$JobRole <- factor(attritionTest$JobRole)
+attritionTest$MaritalStatus <- factor(attritionTest$MaritalStatus)
+attritionTest$Over18 <- factor(attritionTest$Over18)
+attritionTest$OverTime <- factor(attritionTest$OverTime)
+attritionTest$Education <- factor(attritionTest$Education)
+attritionTest$EnvironmentSatisfaction <- factor(attritionTest$EnvironmentSatisfaction)
+attritionTest$JobInvolvement <- factor(attritionTest$JobInvolvement)
+attritionTest$JobLevel <- factor(attritionTest$JobLevel)
+attritionTest$JobSatisfaction <- factor(attritionTest$JobSatisfaction)
+attritionTest$PerformanceRating <- factor(attritionTest$PerformanceRating)
+attritionTest$RelationshipSatisfaction <- factor(attritionTest$RelationshipSatisfaction)
+attritionTest$StockOptionLevel <- factor(attritionTest$StockOptionLevel)
+attritionTest$WorkLifeBalance <- factor(attritionTest$WorkLifeBalance)
+
+str(attritionTest)
+
+#Run Model and Predict On Test Data
+model1 = naiveBayes(attrition[,c(2,4,6,7,8,12,15,16,17,18,20,22,24,26,27,29,30,32,33,34,35,36)],attrition$Attrition, laplace = 1)
+attritionPredict <- unlist(predict(model1,attritionTest[,c(3,5,6,7,11,14,15,16,17,19,21,23,25,26,28,29,31,32,33,34,35)]))
+attritionTest$Attrition <- attritionPredict
+
+summary(attritionTest)
+
+#Create a Data Frame with only ID and Attrition and Sort by ID
+attritionFinal <- attritionTest %>% dplyr::select(ID, Attrition)
+attritionFinal <- attritionFinal[order(attritionFinal$ID),]
+
+#verify data and sorting
+attritionFinal
+
+#Save to CSV
+#write.csv(attritionFinal,"Case2PredictionsClassifyMiller.csv",row.names = FALSE)
+
+```
+
+#Farther Data Analysis
+```{r}
+#Look at how long employees have been at their company by Job Role
+##Managers have the highest median time at the company as well as the largest range of time
+###Sales Reps typically spend the shortest amount of time at the company with the Median time well below 5 years and 75% of all employees spending less than 5 years at the company
+attrition %>% ggplot(aes(x = JobRole, y = YearsAtCompany, color = JobRole)) + geom_boxplot() +
+  labs(title = "Job Role vs Years at Company", x = "Job Role", y = "Years at Company" , color = "Job Role")
+
+#Looking at how Years At Company and Marital Status influence Business Travel
+##Divorced employees who travel have a higher median time at the company
+###Single Employees all have a median time at company around 5 regardless of the amount of business travel
+####All employees who travel frequently have a higher median time at the company regardless of Marital Status
+attrition %>% ggplot(aes(x = BusinessTravel, y = YearsAtCompany, color = MaritalStatus)) + geom_boxplot() +
+  labs(title = "Business Travel vs Years at Company colored by Marital Status", x = "Business Travel",
+       y = "Years At Company", color = "Marital Status")
+
+#How Age and Gender influence Monthly income
+##Seems to be some positive correlation between Monthly Income and Age though it does not appear to be linear
+###The distribution of Monthly Income is very similar between Male and Female
+attrition %>% ggplot(aes(x = Age, y = MonthlyIncome, color = Gender)) + geom_point() + facet_wrap(~ Gender) +
+  labs(title = "How Age and Gender influence Monthly Income", x = "Age", y = "Monthly Income", color = "Gender")
+
+#Look at Mean Monthly Income by Job Role
+##Managers have the highest Mean Income while Sales Reps have the lowest Mean Income
+###33% of the Job Roles have a Mean Income over 7,500
+####A little more than 50% of the Job Roles have a Mean Income over 5,000
+#####There are 4 Job Roles with a Mean Income of around 2,500 or less
+AvgRoleIncome <- ddply(attrition, "JobRole", summarise, MMI = mean(MonthlyIncome)) 
+ggplot(AvgRoleIncome, aes(x = JobRole, y = MMI, fill = JobRole)) + geom_bar(stat = "identity") +
+  labs(title = "Mean Monthly Income per Job Role", x = "Job Role", y = "Mean Income (Monthly)", color = "Job Role")
+
+#Histogram of Job Satisfaction in the 3 departments
+##Human Resources has the fewest responses, however there is little variation in total responses for rating 1,3, and 4
+###Overall most of the company is satisfied (rating 3 or 4) with their managers
+attrition %>% ggplot(aes(x = RelationshipSatisfaction, fill = Department)) + geom_bar() + facet_grid(~Department) +
+  labs(title = "Distribution of Relationship Satisfaction Rating of Manager by Department", x = "Satisfaction Rating",
+       y = "Total Responses")
+
+```
+
+#Monthly Income Analysis
+##Selecting the variables
+```{r}
+#Keep = YearsAtCompany, JobLevel, Age, OverTime
+attrition %>% dplyr::select(MonthlyIncome, YearsAtCompany,JobLevel,Age,OverTime)%>%
+  ggpairs()
+
+#Keep = Department, Education
+attrition %>% dplyr::select(MonthlyIncome, DailyRate,Department,Education,EducationField)%>%
+  ggpairs()
+
+#Keep = JobRole
+attrition %>% dplyr::select(MonthlyIncome, Gender,HourlyRate,JobInvolvement,JobRole)%>%
+  ggpairs()
+
+#Keep = None
+attrition %>% dplyr::select(MonthlyIncome, MonthlyRate,NumCompaniesWorked,PercentSalaryHike,PerformanceRating)%>%
+  ggpairs()
+
+#Keep = TotalWorkingYears
+attrition %>% dplyr::select(MonthlyIncome, StockOptionLevel,TotalWorkingYears,TrainingTimesLastYear,WorkLifeBalance)%>%
+  ggpairs()
+
+#Keep = YearsInCurrentRole, YearsSinceLastPromotion, YearsWithCurrManager
+attrition %>% dplyr::select(MonthlyIncome, YearsInCurrentRole,YearsSinceLastPromotion,YearsWithCurrManager)%>%
+  ggpairs()
+
+#Create a list to hold 11 chosen variables
+custom.var = attrition %>% 
+  dplyr::select(MonthlyIncome, ID, YearsAtCompany, JobLevel, Age, Department, Education, JobRole,
+                OverTime, TotalWorkingYears, YearsInCurrentRole, YearsSinceLastPromotion, YearsWithCurrManager)
+```
+
+#Create the Model and Test
+##RMSE = 1018.206
+```{r}
+#Model Training
+set.seed(11)
+train.control <- trainControl(method = "cv", number = 10)
+custom.model = train(MonthlyIncome~.-ID, data=custom.var,
+                   method="lmStepAIC",
+                   trControl = train.control,
+                   trace=FALSE)
+custom.model$results
+custom.model$finalModel
+summary(custom.model$finalModel)
+print(custom.model)
+
+
+#Load in Test Data and Clean Data to match train data
+MonthlyIncomeTest <- read.csv(file.choose())
+#MonthlyIncomeTest <- read.csv("/Users/allenmiller/OneDrive - Southern Methodist University/Doing Data Science/CaseStudy2/CaseStudy2CompSet No Salary.csv")
+
+str(MonthlyIncomeTest)
+
+MonthlyIncomeTest$Attrition <- factor(MonthlyIncomeTest$Attrition)
+MonthlyIncomeTest$BusinessTravel <- factor(MonthlyIncomeTest$BusinessTravel)
+MonthlyIncomeTest$Department <- factor(MonthlyIncomeTest$Department)
+MonthlyIncomeTest$EducationField <- factor(MonthlyIncomeTest$EducationField)
+MonthlyIncomeTest$Gender <- factor(MonthlyIncomeTest$Gender)
+MonthlyIncomeTest$JobRole <- factor(MonthlyIncomeTest$JobRole)
+MonthlyIncomeTest$MaritalStatus <- factor(MonthlyIncomeTest$MaritalStatus)
+MonthlyIncomeTest$Over18 <- factor(MonthlyIncomeTest$Over18)
+MonthlyIncomeTest$OverTime <- factor(MonthlyIncomeTest$OverTime)
+
+str(MonthlyIncomeTest)
+
+#Create a list to hold 11 chosen variables
+IncomeTestData = attrition %>% 
+  dplyr::select(MonthlyIncome, ID, YearsAtCompany, JobLevel, Age, Department, Education, JobRole,
+                OverTime, TotalWorkingYears, YearsInCurrentRole, YearsSinceLastPromotion, YearsWithCurrManager)
+
+#Test Data and Add it to a sorted data frame by ID
+IncomeTestData$MonthlyIncome <- predict(custom.model, IncomeTestData)
+custom.result <- IncomeTestData %>% dplyr::select(ID,MonthlyIncome)
+custom.result <- custom.result[order(custom.result$ID),]
+
+#Verify Order and View Predictions
+custom.result
+
+#Save CSV File
+#write.csv(custom.result,"Case2PredictionsRegressMiller.csv",row.names = FALSE)
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
